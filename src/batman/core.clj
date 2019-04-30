@@ -19,10 +19,13 @@
 (defn read-line-or-available [conn]
   (let [in (.getInputStream conn)]
     (loop [result ""]
-      (let [s (char (.read in))]
-        (if (or  (= s \newline) (>= 0 (.available in)))
-          (str result s)
-          (recur (str result s)))))))
+      (let [b (.read in)]
+        (if (= b -1) ;EOF
+          (throw (java.io.EOFException.))
+          (let [c (char b)]
+            (if (or  (= c \newline) (>= 0 (.available in)))
+              (str result c)
+              (recur (str result c)))))))))
 
 
 (defn handle-message [m c]
