@@ -1,13 +1,11 @@
 (ns batman.core
   (:gen-class)
   (:require [clj-telnet.core :as telnet]
-            [nrepl.cmdline :as nrepl-cmdline]
-            [clojure.core.async :as async
-             :refer [>! <! >!! <!! go chan buffer close! thread
-                     alts! alts!! timeout]]))
+            [nrepl.cmdline :as nrepl-cmdline]))
 
 
 (defonce conn (atom nil))
+(defonce triggers (atom []))
 
 (defn start-conn [host port]
   (reset! conn (telnet/get-telnet host port)))
@@ -28,6 +26,7 @@
 
 
 (defn handle-message [m c]
+  (run! #(% m) @triggers)
   (print m)
   (flush))
 
@@ -36,7 +35,10 @@
     (try
       (-> (read-line-or-available c)
           (handle-message c))
-      (catch Exception e 
+      (catch java.io.EOFException e
+        (println "disconnected")
+        (deliver quit true))
+      (catch Exception e
         (prn e)
         (deliver quit true)))
     (recur quit c)))
@@ -49,7 +51,7 @@
 (defn input-loop [quit c]
   (loop []
     (when (not (realized? quit))
-      (when-let [l (read-line)] 
+      (when-let [l (read-line)]
         (handle-input c l)
         (recur))))
   (println "input done")
@@ -58,9 +60,9 @@
 (defn start []
   (let [c (start-conn "bat.org" 23)
           quit (promise)]
-    (thread 
+    (future
       (input-loop quit c))
-    (thread  
+    (future
       (conn-loop quit c))
     @quit
     (stop-conn)))
@@ -77,10 +79,57 @@
     (println (format "nREPL server started on port %d" (:port nrepl)))))
 
 
+(defn write-to [f & s]
+  (spit f (apply print-str s)))
+
+(defn send-cmd [s]
+  (telnet/write @conn s))
+
+(defn inject-utils [ns]
+  (doseq [[k f] {'send-cmd send-cmd
+                 'write-to write-to}]
+    (intern ns k f)))
+
+
+(defn register-trigger! [f]
+  (swap! triggers conj f))
+
+
+(defn load-script [path]
+  (let [name (-> path
+                 (clojure.string/replace #"\.clj$" "")
+                 (clojure.string/replace #"/" "."))
+        space (create-ns (symbol name))]
+    (inject-utils space)
+    (binding [*ns* space]
+      (clojure.core/refer-clojure)
+      (load-file path)
+      (println "created ns: " (ns-name space))
+
+      (when-let [setup (resolve (symbol name "/setup"))]
+        (@setup))
+      (when-let [u (resolve (symbol name "/update"))]
+       (register-trigger! @u))
+
+      (println "regiestered update " (ns-name space)))))
+
+(defn load-scripts
+  ([] (load-scripts "scripts/"))
+  ([path] (run!  #(load-script (.getPath %))
+                 (filter #(.isFile %)
+                         (file-seq (clojure.java.io/file path))))))
+
+
+(defn reload-scripts []
+  (reset! triggers [])
+  (load-scripts))
+
+
 (defn -main []
   (start-nrepl-server)
   (start)
   (System/exit 0))
+
 
 (comment 
   (def c (start-conn "bat.org" 23))
