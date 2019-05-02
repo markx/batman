@@ -6,7 +6,8 @@
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [clj-telnet "0.3.0"]
                  [nrepl "0.6.0"]
-                 [cider/cider-nrepl "0.21.1"]]
+                 [cider/cider-nrepl "0.21.1"]
+                 [com.taoensso/timbre "4.10.0"]]
   :plugins [[cider/cider-nrepl "0.21.1"]]
   :main ^:skip-aot batman.core
   :target-path "target/%s"

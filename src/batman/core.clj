@@ -1,8 +1,15 @@
 (ns batman.core
   (:gen-class)
   (:require [clj-telnet.core :as telnet]
-            [nrepl.cmdline :as nrepl-cmdline]))
+            [nrepl.cmdline :as nrepl-cmdline]
+            [taoensso.timbre :as log]
+            [taoensso.timbre.appenders.core :as appenders]))
 
+(def log-file "log.txt")
+(log/merge-config!
+  {:appenders
+    {:spit (appenders/spit-appender {:fname log-file})
+     :println {:enabled? false}}})
 
 (defonce conn (atom nil))
 (defonce triggers (atom []))
@@ -48,7 +55,7 @@
 
 
 (defn handle-input [c l]
-  (println "input: " (pr-str l))
+  (log/debug "input: " (pr-str l))
   (telnet/write c l))
 
 (defn input-loop [quit c]
@@ -57,7 +64,6 @@
       (when-let [l (read-line)]
         (handle-input c l)
         (recur))))
-  (println "input done")
   (deliver quit true))
 
 (defn start []
@@ -107,14 +113,14 @@
     (binding [*ns* space]
       (clojure.core/refer-clojure)
       (load-file path)
-      (println "created ns: " (ns-name space))
+      (log/info "created ns: " (ns-name space))
 
       (when-let [setup (resolve (symbol name "/setup"))]
         (@setup))
       (when-let [u (resolve (symbol name "/update"))]
        (register-trigger! @u))
 
-      (println "regiestered update " (ns-name space)))))
+      (log/info "regiestered update " (ns-name space)))))
 
 (defn load-scripts
   ([] (load-scripts "scripts/"))
