@@ -28,25 +28,45 @@
     (loop [result ""]
       (let [b (.read in)]
         (if (= b -1) ;EOF
-          (throw (java.io.EOFException.))
+          (throw (java.io.EOFException. "EOF disconnected."))
           (let [c (char b)]
             (if (or  (= c \newline) (>= 0 (.available in)))
               (str result c)
               (recur (str result c)))))))))
 
+(defn message [s]
+  {:message s
+   :gag false})
 
-(defn handle-message [m c]
-  (run! #(% m) @triggers)
-  (print m)
-  (flush))
+
+(defn apply-triggers [msg]
+  (reduce
+    (fn [m f]
+      (or (f m) m))
+    msg
+    @triggers))
+
+
+(defn print-message [m]
+  (when (and (:message m) 
+             (not (:gag m)))
+    (print (:message m))
+    (flush))
+  m)
+
+(defn handle-message [m]
+  (-> m
+      (apply-triggers)
+      (print-message)))
 
 (defn conn-loop [quit c]
   (when (not (realized? quit))
     (try
       (-> (read-line-or-available c)
-          (handle-message c))
-      (catch java.io.EOFException e
-        (println "disconnected")
+          (message)
+          (handle-message)) 
+      (catch java.io.IOException e
+        (println (.getMessage e))
         (deliver quit true))
       (catch Exception e
         (prn e)
@@ -55,7 +75,7 @@
 
 
 (defn handle-input [c l]
-  (log/debug "input: " (pr-str l))
+  (log/info "input: " (pr-str l))
   (telnet/write c l))
 
 (defn input-loop [quit c]
@@ -65,17 +85,6 @@
         (handle-input c l)
         (recur))))
   (deliver quit true))
-
-(defn start []
-  (let [c (start-conn "bat.org" 23)
-          quit (promise)]
-    (future
-      (input-loop quit c))
-    (future
-      (conn-loop quit c))
-    @quit
-    (stop-conn)))
-
 
 (defn nrepl-handler []
   (require 'cider.nrepl)
@@ -94,9 +103,13 @@
 (defn send-cmd [s]
   (telnet/write @conn s))
 
+(defn gag [m]
+  (assoc m :gag true))
+
 (defn inject-utils [ns]
   (doseq [[k f] {'send-cmd send-cmd
-                 'write-to write-to}]
+                 'write-to write-to
+                 'gag gag}]
     (intern ns k f)))
 
 
@@ -113,19 +126,21 @@
     (binding [*ns* space]
       (clojure.core/refer-clojure)
       (load-file path)
-      (log/info "created ns: " (ns-name space))
+      (log/info "created ns: " name)
 
-      (when-let [setup (resolve (symbol name "/setup"))]
+      (when-let [setup (resolve (symbol name "setup"))]
         (@setup))
-      (when-let [u (resolve (symbol name "/update"))]
-       (register-trigger! @u))
-
-      (log/info "regiestered update " (ns-name space)))))
+      (when-let [u (resolve (symbol name "update"))]
+       (register-trigger! @u)
+       (log/info "regiestered update " (ns-name space))
+       (log/info "triggers" @triggers)))))
 
 (defn load-scripts
   ([] (load-scripts "scripts/"))
   ([path] (run!  #(load-script (.getPath %))
-                 (filter #(.isFile %)
+                 (filter (fn [file]
+                           (and (.isFile file)
+                                (re-find #"\.clj$" (.getName file))))
                          (file-seq (clojure.java.io/file path))))))
 
 
@@ -134,13 +149,26 @@
   (load-scripts))
 
 
+(defn start []
+  (let [c (start-conn "bat.org" 23)
+          quit (promise)]
+    (log/info "connected to server" c)
+    (load-scripts)
+    (future
+      (input-loop quit c))
+    (future
+      (conn-loop quit c))
+    @quit
+    (stop-conn)))
+
+
 (defn -main []
   (start-nrepl-server)
   (start)
   (System/exit 0))
 
 
-(comment 
+(comment
   (def c (start-conn "bat.org" 23))
   (defn bar []
     (future))
