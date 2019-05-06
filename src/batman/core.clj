@@ -7,9 +7,9 @@
 
 (def log-file "log.txt")
 (log/merge-config!
-  {:appenders
-    {:spit (appenders/spit-appender {:fname log-file})
-     :println {:enabled? false}}})
+ {:appenders
+  {:spit (appenders/spit-appender {:fname log-file})
+   :println {:enabled? false}}})
 
 (defonce conn (atom nil))
 (defonce triggers (atom []))
@@ -41,14 +41,13 @@
 
 (defn apply-triggers [msg]
   (reduce
-    (fn [m f]
-      (or (f m) m))
-    msg
-    @triggers))
-
+   (fn [m f]
+     (or (f m) m))
+   msg
+   @triggers))
 
 (defn print-message [m]
-  (when (and (:message m) 
+  (when (and (:message m)
              (not (:gag m)))
     (print (:message m))
     (flush))
@@ -64,7 +63,7 @@
     (try
       (-> (read-line-or-available c)
           (message)
-          (handle-message)) 
+          (handle-message))
       (catch java.io.IOException e
         (println (.getMessage e))
         (deliver quit true))
@@ -76,7 +75,8 @@
 
 (defn handle-input [c l]
   (log/info "input: " (pr-str l))
-  (telnet/write c l))
+  (telnet/write c l)
+  (println))
 
 (defn input-loop [quit c]
   (loop []
@@ -106,9 +106,11 @@
 (defn gag [m]
   (assoc m :gag true))
 
+(declare reloads-scripts)
 (defn inject-utils [ns]
   (doseq [[k f] {'send-cmd send-cmd
                  'write-to write-to
+                 'reloads-scripts reloads-scripts
                  'gag gag}]
     (intern ns k f)))
 
@@ -131,9 +133,9 @@
       (when-let [setup (resolve (symbol name "setup"))]
         (@setup))
       (when-let [u (resolve (symbol name "update"))]
-       (register-trigger! @u)
-       (log/info "regiestered update " (ns-name space))
-       (log/info "triggers" @triggers)))))
+        (register-trigger! @u)
+        (log/info "regiestered update " (ns-name space))
+        (log/info "triggers" @triggers)))))
 
 (defn load-scripts
   ([] (load-scripts "scripts/"))
@@ -151,7 +153,7 @@
 
 (defn start []
   (let [c (start-conn "bat.org" 23)
-          quit (promise)]
+        quit (promise)]
     (log/info "connected to server" c)
     (load-scripts)
     (future
