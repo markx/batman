@@ -9,8 +9,8 @@
 (defn prompt-match [m]
   (let [p #"^Hp:(\d+)/(\d+) Sp:(\d+)/(\d+) Ep:(\d+)/(\d+) Exp:(\d+) >"]
     (re-seq p (:message m))))
-(def log-file "log.txt")
 
+(def log-file "debug.log")
 (log/merge-config!
  {:appenders
   {:println nil
@@ -196,7 +196,10 @@
 
 (defn -main []
   (start-nrepl-server)
-  (start)
+  (loop []
+    (start)
+    (println "restarting app")
+    (recur))
   (System/exit 0))
 
 
