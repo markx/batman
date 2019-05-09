@@ -5,14 +5,22 @@
             [taoensso.timbre :as log]
             [taoensso.timbre.appenders.core :as appenders]))
 
+
+(defn prompt-match [m]
+  (let [p #"^Hp:(\d+)/(\d+) Sp:(\d+)/(\d+) Ep:(\d+)/(\d+) Exp:(\d+) >"]
+    (re-seq p (:message m))))
 (def log-file "log.txt")
+
 (log/merge-config!
  {:appenders
-  {:spit (appenders/spit-appender {:fname log-file})
-   :println {:enabled? false}}})
+  {:println nil
+   :spit (merge (appenders/spit-appender {:fname log-file }) {:async? true})}})
 
 (defonce conn (atom nil))
 (defonce triggers (atom []))
+
+(defonce prompt (atom nil))
+(defonce prompt-future (atom nil))
 
 (defn start-conn [host port]
   (reset! conn (telnet/get-telnet host port)))
@@ -34,6 +42,10 @@
               (str result c)
               (recur (str result c)))))))))
 
+
+(defn potential-prompt? [m]
+  (not= \newline (last (:message m))))
+
 (defn message [s]
   {:message s
    :gag false})
@@ -49,14 +61,30 @@
 (defn print-message [m]
   (when (and (:message m)
              (not (:gag m)))
-    (print (:message m))
+    (if @prompt
+      (do
+        (print "\33[2K\r")
+        (print (:message m))
+        (print (:message @prompt)))
+      (print (:message m)))
+      
     (flush))
   m)
 
 (defn handle-message [m]
-  (-> m
-      (apply-triggers)
-      (print-message)))
+  (let [m (apply-triggers m)]
+    (print-message m)
+    (when (potential-prompt? m)
+      (when (future? @prompt-future)
+        (future-cancel @prompt-future))
+      (if (prompt-match m)
+        (reset! prompt m)
+        (reset! prompt-future 
+                (future 
+                  (Thread/sleep 400)
+                  (reset! prompt m)
+                  (log/debug "update prompt" (prn-str (:message @prompt)))))))))
+
 
 (defn conn-loop [quit c]
   (when (not (realized? quit))
@@ -76,6 +104,8 @@
 (defn handle-input [c l]
   (log/info "input: " (pr-str l))
   (telnet/write c l)
+  (reset! prompt nil)
+  (reset! prompt-future nil)
   (println))
 
 (defn input-loop [quit c]
@@ -172,7 +202,15 @@
 
 (comment
   (def c (start-conn "bat.org" 23))
-  (defn bar []
-    (future))
-  (Thread/sleep 1000))
+  (Thread/sleep 1000)
+  (load-file "scripts/test.clj")
+  (load-script "scripts/test.clj")
+  (reload-scripts)
+  (let [name (symbol "scripts.aaa")]
+    (binding [*ns* (create-ns name)]
+      (load-file "scripts/test.clj")))
+  (write-to "chat.txt" "hahahha" "heehehhe")
+  (re-find #".*clj$" (.getName (clojure.java.io/file "scripts/test.clj")))
+  (run! #(load-file (.getAbsolutePath %)) (filter #(.isFile %) (file-seq (clojure.java.io/file "scripts/")))))
+
 
