@@ -3,7 +3,8 @@
   (:require [clj-telnet.core :as telnet]
             [nrepl.cmdline :as nrepl-cmdline]
             [taoensso.timbre :as log]
-            [taoensso.timbre.appenders.core :as appenders]))
+            [taoensso.timbre.appenders.core :as appenders]
+            [batman.readline :as rl]))
 
 
 (defn prompt-match [m]
@@ -108,10 +109,14 @@
   (reset! prompt-future nil)
   (println))
 
+
+(defn- get-input []
+  (rl/read-line (:message @prompt)))
+
 (defn input-loop [quit c]
   (loop []
     (when (not (realized? quit))
-      (when-let [l (read-line)]
+      (when-let [l (get-input)]
         (handle-input c l)
         (recur))))
   (deliver quit true))
@@ -187,9 +192,9 @@
     (log/info "connected to server" c)
     (load-scripts)
     (future
-      (input-loop quit c))
-    (future
       (conn-loop quit c))
+    (future
+      (input-loop quit c))
     @quit
     (stop-conn)))
 
