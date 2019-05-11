@@ -1,23 +1,30 @@
 (ns batman.readline
   (:require [taoensso.timbre :as log])
-  (:import 
-    [org.jline.reader LineReaderBuilder Completer Candidate]
-    [org.jline.terminal TerminalBuilder]))
+  (:import
+    [org.jline.terminal TerminalBuilder]
+    [org.jline.reader
+      LineReader
+      LineReader$Option
+      LineReaderBuilder
+      Completer
+      Candidate]))
 
 
 (defonce dict (atom '()))
 
+
+(def HISTORY_FILE (str (System/getProperty "user.home") "/.batman_history"))
 
 
 (defn add-completion-candidates! [& s]
  (swap! dict concat s))
 
 (defn completer []
- (proxy [Completer] [] 
-   (complete [reader cli candidates] 
+ (proxy [Completer] []
+   (complete [reader cli candidates]
              (when (not-empty @dict)
-               (.addAll candidates 
-                        (map #(Candidate. %) 
+               (.addAll candidates
+                        (map #(Candidate. %)
                              @dict))))))
 
 (defn line-reader []
@@ -27,8 +34,10 @@
     (-> (LineReaderBuilder/builder)
         (.terminal terminal)
         (.completer (completer))
+        (.option LineReader$Option/HISTORY_TIMESTAMPED false)
+        (.variables (java.util.HashMap. {LineReader/HISTORY_FILE HISTORY_FILE}))
         (.build))))
-  
+
 (def default-reader (line-reader))
 
 
@@ -37,20 +46,20 @@
    (clojure.string/split % #"\s+")
    (remove empty? %)))
 
- 
-(defn read-line 
+
+(defn read-line
   ([prompt] (read-line default-reader prompt))
   ([reader prompt]
-   (log/debug "prompt:" prompt)
    (let [line (.readLine reader prompt)]
+     (log/debug "got line" line)
      (->> line
-          (line->words)    
+          (line->words)
           (apply add-completion-candidates!))
      line)))
 
 
 
-(comment 
+(comment
   (line->words "")
   (read-line))
 
