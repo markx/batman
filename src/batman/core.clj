@@ -1,6 +1,6 @@
 (ns batman.core
   (:gen-class)
-  (:require [clj-telnet.core :as telnet]
+  (:require [batman.conn :as conn]
             [nrepl.cmdline :as nrepl-cmdline]
             [taoensso.timbre :as log]
             [taoensso.timbre.appenders.core :as appenders]))
@@ -16,31 +16,11 @@
   {:println nil
    :spit (merge (appenders/spit-appender {:fname log-file }) {:async? true})}})
 
-(defonce conn (atom nil))
 (defonce triggers (atom []))
 
 (defonce prompt (atom nil))
 (defonce prompt-future (atom nil))
 
-(defn start-conn [host port]
-  (reset! conn (telnet/get-telnet host port)))
-
-(defn stop-conn []
-  (when @conn
-    (telnet/kill-telnet @conn)
-    (reset! conn nil)))
-
-
-(defn read-line-or-available [conn]
-  (let [in (.getInputStream conn)]
-    (loop [result ""]
-      (let [b (.read in)]
-        (if (= b -1) ;EOF
-          (throw (java.io.EOFException. "EOF disconnected."))
-          (let [c (char b)]
-            (if (or  (= c \newline) (>= 0 (.available in)))
-              (str result c)
-              (recur (str result c)))))))))
 
 
 (defn potential-prompt? [m]
@@ -67,7 +47,6 @@
         (print (:message m))
         (print (:message @prompt)))
       (print (:message m)))
-      
     (flush))
   m)
 
@@ -79,31 +58,37 @@
         (future-cancel @prompt-future))
       (if (prompt-match m)
         (reset! prompt m)
-        (reset! prompt-future 
-                (future 
+        (reset! prompt-future
+                (future
                   (Thread/sleep 400)
                   (reset! prompt m)
                   (log/debug "update prompt" (prn-str (:message @prompt)))))))))
 
 
+(defn handle-frames [fs]
+  (->> fs
+       (map :text)
+       (remove nil?)
+       (map (partial map char))
+       (map (partial reduce str))))
+
+
 (defn conn-loop [quit c]
-  (when (not (realized? quit))
-    (try
-      (-> (read-line-or-available c)
-          (message)
-          (handle-message))
-      (catch java.io.IOException e
-        (println (.getMessage e))
-        (deliver quit true))
-      (catch Exception e
-        (prn e)
-        (deliver quit true)))
-    (recur quit c)))
+  (let [frames (conn/handle-seq (conn/read-bytes c))
+        lines (handle-frames frames)]
+    (run! (fn [l]
+            (-> l
+                (message)
+                (handle-message)))
+          lines))
+
+
+  (deliver quit true))
 
 
 (defn handle-input [c l]
   (log/info "input: " (pr-str l))
-  (telnet/write c l)
+  (conn/write c l)
   (reset! prompt nil)
   (reset! prompt-future nil)
   (println))
@@ -130,15 +115,13 @@
 (defn write-to [f & s]
   (spit f (apply print-str s)))
 
-(defn send-cmd [s]
-  (telnet/write @conn s))
 
 (defn gag [m]
   (assoc m :gag true))
 
 (declare reloads-scripts)
 (defn inject-utils [ns]
-  (doseq [[k f] {'send-cmd send-cmd
+  (doseq [[k f] {'send-cmd conn/send-cmd
                  'write-to write-to
                  'reloads-scripts reloads-scripts
                  'gag gag}]
@@ -182,8 +165,8 @@
 
 
 (defn start []
-  (let [c (start-conn "bat.org" 23)
-        quit (promise)]
+  (let [quit (promise)
+        c (conn/start-conn "bat.org" 23)]
     (log/info "connected to server" c)
     (load-scripts)
     (future
@@ -191,7 +174,7 @@
     (future
       (conn-loop quit c))
     @quit
-    (stop-conn)))
+    (conn/stop-conn)))
 
 
 (defn -main []
@@ -204,7 +187,6 @@
 
 
 (comment
-  (def c (start-conn "bat.org" 23))
   (Thread/sleep 1000)
   (load-file "scripts/test.clj")
   (load-script "scripts/test.clj")
