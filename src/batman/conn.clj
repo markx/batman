@@ -61,6 +61,12 @@
   (write @conn s))
 
 
+(defn take-byte-or-IAC [s]
+  (when (seq s)
+    (if (= cmd-IAC (first s) (second s))
+      [cmd-IAC (rest (rest s))]
+      [(first s) (rest s)])))
+
 (defn take-text [s]
   (when (seq s)
     (let [x (first s)
@@ -75,7 +81,7 @@
 
         (= cmd-IAC x (first rs))
         (let [sub (take-text (rest rs))]
-          [(cons x (first sub)) (second sub)])
+          [(cons cmd-IAC (first sub)) (second sub)])
 
         :else
         (let [sub (take-text rs)]
@@ -91,14 +97,16 @@
           (= cmd-DONT x)
           (= cmd-WILL x)
           (= cmd-WONT x))
-        [[x (first rs)] (rest rs)]
+        (let [[n rs] (take-byte-or-IAC rs)]
+          [[x n] rs])
 
         (= cmd-SB x)
         (loop [result nil rs rs]
           (if (and (= cmd-IAC (first rs))
                   (= cmd-SE (second rs)))
               [result (rest (rest rs))]
-              (recur (conj result (first rs)) (rest rs))))
+              (let [[n rs] (take-byte-or-IAC rs)]
+                (recur (conj result n) rs))))
 
         :else
         (do
@@ -115,7 +123,6 @@
                               [take-cmd :cmd]
                               [take-text :text])]
       (let [[frame rs] (take-func s)]
-        (log/debug "!!!frame: " frame)
         (if frame
           (cons {label frame} (lazy-seq (handle-seq rs)))
           (handle-seq rs))))))
