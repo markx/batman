@@ -6,10 +6,6 @@
             [taoensso.timbre.appenders.core :as appenders]))
 
 
-(defn prompt-match [m]
-  (let [p #"^Hp:(\d+)/(\d+) Sp:(\d+)/(\d+) Ep:(\d+)/(\d+) Exp:(\d+) >"]
-    (re-seq p (:message m))))
-
 (def log-file "debug.log")
 (log/merge-config!
  {:appenders
@@ -19,12 +15,7 @@
 (defonce triggers (atom []))
 
 (defonce prompt (atom nil))
-(defonce prompt-future (atom nil))
 
-
-
-(defn potential-prompt? [m]
-  (not= \newline (last (:message m))))
 
 (defn message [s]
   {:message s
@@ -53,43 +44,33 @@
 (defn handle-message [m]
   (let [m (apply-triggers m)]
     (print-message m)
-    (when (potential-prompt? m)
-      (when (future? @prompt-future)
-        (future-cancel @prompt-future))
-      (if (prompt-match m)
-        (reset! prompt m)
-        (reset! prompt-future
-                (future
-                  (Thread/sleep 400)
-                  (reset! prompt m)
-                  (log/debug "update prompt" (prn-str (:message @prompt)))))))))
+    (when (:prompt m)
+      (reset! prompt m))))
 
 
-(defn handle-frames [fs]
-  (->> fs
-       (map :text)
-       (remove nil?)
-       (map (partial map char))
-       (map (partial reduce str))))
+(defn handle-frame [{:keys [text prompt] :as f}]
+  (if text
+    (->> text
+      (map char)
+      (apply str)
+      (message)
+      (merge {:prompt prompt})
+      (handle-message))
+    (log/debug f))
+    
 
 
 (defn conn-loop [quit c]
-  (let [frames (conn/handle-seq (conn/read-bytes c))
-        lines (handle-frames frames)]
-    (run! (fn [l]
-            (-> l
-                (message)
-                (handle-message)))
-          lines))
+  (let [frames (conn/bytes->frames (conn/read-bytes c))]
+    (run! handle-frame frames))
 
   (deliver quit true))
 
 
 (defn handle-input [c l]
   (log/info "input: " (pr-str l))
-  (conn/write c l)
   (reset! prompt nil)
-  (reset! prompt-future nil)
+  (conn/write c l)
   (println))
 
 (defn input-loop [quit c]

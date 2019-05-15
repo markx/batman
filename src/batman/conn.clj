@@ -133,16 +133,15 @@
           {:frame nil
            :rest rs})))))
 
-(defn handle-seq [s]
+(defn bytes->frames [s]
   (when (seq s)
     (let [take-func (if (cmd-seq? s)
                         take-cmd
                         take-text)]
       (let [{:keys [frame rest]} (take-func s)]
-        (log/debug "!!!frame: " frame)
         (if frame
-          (cons frame (lazy-seq (handle-seq rest)))
-          (handle-seq rest))))))
+          (cons frame (lazy-seq (bytes->frames rest)))
+          (bytes->frames rest))))))
 
 (defn stream->bytes [in]
   (take-while some?
