@@ -61,11 +61,19 @@
   (write @conn s))
 
 
-(defn take-byte-or-IAC [s]
+(defn- take-byte-or-IAC [s]
   (when (seq s)
     (if (= cmd-IAC (first s) (second s))
-      [cmd-IAC (rest (rest s))]
-      [(first s) (rest s)])))
+      {:b (first s)
+       :rest (rest (rest s))}
+
+      {:b (first s)
+       :rest (rest s)})))
+
+(defn- cmd-seq? [s]
+  (and (= cmd-IAC (first s))
+       (not= cmd-IAC (second s))))
+
 
 (defn take-text [s]
   (when (seq s)
@@ -73,19 +81,28 @@
           rs (rest s)]
       (cond
         (= (byte \newline) x)
-        ["\n" rs]
+        {:frame {:text [\newline]}
+         :rest rs}
 
         (and (= cmd-IAC x)
-             (not= cmd-IAC (first rs)))
-        [nil s]
+             (= cmd-GA (first rs)))
+        {:frame {:text nil :prompt true}
+         :rest (rest rs)}
 
+        (cmd-seq? s)
+        {:frame nil
+         :rest s}
+
+        ; maybe unnecessary? 255 is meaningless in text?
         (= cmd-IAC x (first rs))
-        (let [sub (take-text (rest rs))]
-          [(cons cmd-IAC (first sub)) (second sub)])
+        (let [{subframe :frame rs :rest} (take-text (rest rs))]
+          {:frame (update subframe :text (partial cons x))
+           :rest rs})
 
         :else
-        (let [sub (take-text rs)]
-          [(cons x (first sub)) (second sub)])))))
+        (let [{subframe :frame rs :rest} (take-text rs)]
+          {:frame (update subframe :text (partial cons x))
+           :rest rs})))))
 
 (defn take-cmd [s]
   (when (= (first s) cmd-IAC)
@@ -97,48 +114,49 @@
           (= cmd-DONT x)
           (= cmd-WILL x)
           (= cmd-WONT x))
-        (let [[n rs] (take-byte-or-IAC rs)]
-          [[x n] rs])
+        (let [{:keys [b rest]} (take-byte-or-IAC rs)]
+          {:frame {:cmd [x b]}
+           :rest rest})
 
         (= cmd-SB x)
         (loop [result nil rs rs]
           (if (and (= cmd-IAC (first rs))
                   (= cmd-SE (second rs)))
-              [result (rest (rest rs))]
-              (let [[n rs] (take-byte-or-IAC rs)]
-                (recur (conj result n) rs))))
+              {:frame {:cmd result}
+               :rest (rest (rest rs))}
+              (let [{:keys [b rest]} (take-byte-or-IAC rs)]
+                (recur (conj result b) rest))))
 
         :else
         (do
           (log/info "unknown cmd" x)
-          [nil rs])))))
-
-(defn- cmd-seq? [s]
-  (and (= cmd-IAC (first s))
-       (not= cmd-IAC (second s))))
+          {:frame nil
+           :rest rs})))))
 
 (defn handle-seq [s]
-  (when (and (seq s) (first s))
-    (let [[take-func label] (if (cmd-seq? s)
-                              [take-cmd :cmd]
-                              [take-text :text])]
-      (let [[frame rs] (take-func s)]
+  (when (seq s)
+    (let [take-func (if (cmd-seq? s)
+                        take-cmd
+                        take-text)]
+      (let [{:keys [frame rest]} (take-func s)]
+        (log/debug "!!!frame: " frame)
         (if frame
-          (cons {label frame} (lazy-seq (handle-seq rs)))
-          (handle-seq rs))))))
+          (cons frame (lazy-seq (handle-seq rest)))
+          (handle-seq rest))))))
 
 (defn stream->bytes [in]
-  (repeatedly
-    (fn []
-      (try
-        (let [b (.read in)]
-          (if (= b -1) ;EOF
-            (throw (java.io.EOFException. "EOF"))
-            b))
-        (catch java.io.IOException e
-          (println (.getMessage e)))
-        (catch Exception e
-          (prn e))))))
+  (take-while some?
+   (repeatedly
+     (fn []
+       (try
+         (let [b (.read in)]
+           (if (= b -1) ;EOF
+             (throw (java.io.EOFException. "EOF"))
+             b))
+         (catch java.io.IOException e
+           (println (.getMessage e)))
+         (catch Exception e
+           (prn e)))))))
 
 
 (defn read-bytes [socket]
