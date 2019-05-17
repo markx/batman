@@ -47,8 +47,12 @@
    (remove empty? %)))
 
 
+(defn style-prompt [prompt]
+  ; blue prompt
+  (format "\33[34m%s\33[39m" prompt))
+
 (defn read-line
-  ([prompt] (read-line default-reader prompt))
+  ([prompt] (read-line default-reader (style-prompt prompt)))
   ([reader prompt]
    (let [line (.readLine reader prompt)]
      (log/debug "got line" line)
@@ -57,9 +61,19 @@
           (apply add-completion-candidates!))
      line)))
 
+(defn rerender-prompt []
+  (when (.isReading default-reader) ; if not reading, this will block
+    (doto default-reader
+      (.clear)
+      (.redisplay))))
 
+(defn print-above-prompt [s]
+  (.printAbove default-reader s))
+  ;(print "\33[2K\r")
 
 (comment
+  ( safe-print "haha\n")
+  (re-seq #"^|\s+(\w{2,})\s+|\z" "this&& is  a word")
   (line->words "")
   (read-line))
 

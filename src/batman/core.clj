@@ -15,7 +15,7 @@
 
 (defonce triggers (atom []))
 
-(defonce prompt (atom nil))
+(defonce prompt (atom (promise)))
 
 
 (defn message [s]
@@ -33,20 +33,14 @@
 (defn print-message [m]
   (when (and (:message m)
              (not (:gag m)))
-    (if @prompt
-      (do
-        (print "\33[2K\r")
-        (print (:message m))
-        (print (:message @prompt)))
-      (print (:message m)))
-    (flush))
+    (rl/print-above-prompt (:message m)))
   m)
 
 (defn handle-message [m]
   (let [m (apply-triggers m)]
-    (print-message m)
-    (when (:prompt m)
-      (reset! prompt m))))
+    (if (:prompt m)
+      (deliver @prompt m)
+      (print-message m))))
 
 
 (defn handle-frame [{:keys [text prompt] :as f}]
@@ -57,7 +51,7 @@
       (message)
       (merge {:prompt prompt})
       (handle-message))
-    (log/debug f))
+    (log/debug f)))
     
 
 
@@ -70,13 +64,13 @@
 
 (defn handle-input [c l]
   (log/info "input: " (pr-str l))
-  (reset! prompt nil)
+  (reset! prompt (promise))
   (conn/write c l)
   (println))
 
 
 (defn- get-input []
-  (rl/read-line (:message @prompt)))
+  (rl/read-line (:message @@prompt)))
 
 (defn input-loop [quit c]
   (loop []
@@ -98,7 +92,7 @@
 
 
 (defn write-to [f & s]
-  (spit f (apply print-str s)))
+  (spit f (apply print-str s) :append true))
 
 
 (defn gag [m]
@@ -182,5 +176,4 @@
   (write-to "chat.txt" "hahahha" "heehehhe")
   (re-find #".*clj$" (.getName (clojure.java.io/file "scripts/test.clj")))
   (run! #(load-file (.getAbsolutePath %)) (filter #(.isFile %) (file-seq (clojure.java.io/file "scripts/")))))
-
 
