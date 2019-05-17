@@ -127,6 +127,10 @@
               (let [{:keys [b rest]} (take-byte-or-IAC rs)]
                 (recur (conj result b) rest))))
 
+        (= cmd-GA x)
+        {:frame {:text nil :prompt true}
+         :rest rs}
+
         :else
         (do
           (log/info "unknown cmd" x)

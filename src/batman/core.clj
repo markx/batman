@@ -49,7 +49,7 @@
 
 
 (defn handle-frame [{:keys [text prompt] :as f}]
-  (if text
+  (if (or text prompt)
     (->> text
       (map char)
       (apply str)
