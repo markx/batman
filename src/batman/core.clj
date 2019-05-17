@@ -40,7 +40,12 @@
   (let [m (apply-triggers m)]
     (if (:prompt m)
       (deliver @prompt m)
-      (print-message m))))
+      (print-message m))
+
+    (->> m
+        (:message)
+        (rl/extract-candidates)
+        (apply rl/add-completion-candidates!))))
 
 
 (defn handle-frame [{:keys [text prompt] :as f}]

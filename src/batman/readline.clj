@@ -41,10 +41,13 @@
 (def default-reader (line-reader))
 
 
-(defn- line->words [line]
+(defn extract-candidates [line]
  (as-> line %
+   (clojure.string/replace % #"\w*[@#$%^&*,|]{2,}\w*" " ") ; remove words with weird symbols
+   (clojure.string/replace % #"\x1b\[[0-9;]*[a-zA-Z]" " ") ; remove ansi codes
+   (clojure.string/replace % #"[^\w\s]" " ")
    (clojure.string/split % #"\s+")
-   (remove empty? %)))
+   (remove (comp (partial > 2) count) %)))
 
 
 (defn style-prompt [prompt]
@@ -57,7 +60,7 @@
    (let [line (.readLine reader prompt)]
      (log/debug "got line" line)
      (->> line
-          (line->words)
+          (extract-candidates)
           (apply add-completion-candidates!))
      line)))
 
