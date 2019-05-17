@@ -98,11 +98,11 @@
 (defn gag [m]
   (assoc m :gag true))
 
-(declare reloads-scripts)
+(declare reload-scripts)
 (defn inject-utils [ns]
   (doseq [[k f] {'send-cmd conn/send-cmd
                  'write-to write-to
-                 'reloads-scripts reloads-scripts
+                 'reload-scripts reload-scripts
                  'gag gag}]
     (intern ns k f)))
 
