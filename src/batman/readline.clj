@@ -7,7 +7,8 @@
       LineReader$Option
       LineReaderBuilder
       Completer
-      Candidate]))
+      Candidate
+      EndOfFileException]))
 
 
 (defonce dict (atom '()))
@@ -57,18 +58,15 @@
 (defn read-line
   ([prompt] (read-line default-reader (style-prompt prompt)))
   ([reader prompt]
-   (let [line (.readLine reader prompt)]
-     (log/debug "got line" line)
-     (->> line
-          (extract-candidates)
-          (apply add-completion-candidates!))
-     line)))
-
-(defn rerender-prompt []
-  (when (.isReading default-reader) ; if not reading, this will block
-    (doto default-reader
-      (.clear)
-      (.redisplay))))
+   (try
+     (let [line (.readLine reader prompt)]
+       (log/debug "got line" line)
+       (->> line
+            (extract-candidates)
+            (apply add-completion-candidates!))
+       line)
+     (catch org.jline.reader.EndOfFileException e
+       nil))))
 
 (defn print-above-prompt [s]
   (.printAbove default-reader s))
