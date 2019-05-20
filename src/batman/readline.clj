@@ -1,5 +1,6 @@
 (ns batman.readline
   (:require [taoensso.timbre :as log])
+  (:refer-clojure :exclude [read-line])
   (:import
     [org.jline.terminal TerminalBuilder]
     [org.jline.reader

@@ -14,8 +14,17 @@
    :spit (merge (appenders/spit-appender {:fname log-file }) {:async? true})}})
 
 (defonce triggers (atom []))
-
 (defonce prompt (atom (promise)))
+
+
+(defmacro thread [& body]
+  `(.start (Thread. (fn [] ~@body))))
+
+(defmacro safe [& body]
+  `(try
+     ~@body
+     (catch Exception e#
+       (log/error e#))))
 
 
 (defn message [s]
@@ -26,7 +35,10 @@
 (defn apply-triggers [msg]
   (reduce
    (fn [m f]
-     (or (f m) m))
+     (or (safe
+           (log/debug "applying" f)
+           (f m))
+         m))
    msg
    @triggers))
 
@@ -57,7 +69,6 @@
       (merge {:prompt prompt})
       (handle-message))
     (log/debug f)))
-    
 
 
 (defn conn-loop [quit c]
@@ -124,14 +135,12 @@
     (inject-utils space)
     (binding [*ns* space]
       (clojure.core/refer-clojure)
-      (load-file path)
+      (safe (load-file path))
       (log/info "created ns: " name)
 
-      (when-let [setup (resolve (symbol name "setup"))]
-        (@setup))
-      (when-let [u (resolve (symbol name "update"))]
-        (register-trigger! @u)
-        (log/info "regiestered update " (ns-name space))
+      (when-let [u (resolve (symbol name "UPDATE"))]
+        (register-trigger! u)
+        (log/info "regiestered UPDATE " (ns-name space))
         (log/info "triggers" @triggers)))))
 
 (defn load-scripts
@@ -153,12 +162,13 @@
         c (conn/start-conn "bat.org" 23)]
     (log/info "connected to server" c)
     (load-scripts)
-    (future
+    (thread
       (conn-loop quit c))
-    (future
+    (thread
       (input-loop quit c))
     @quit
     (conn/stop-conn)))
+
 
 
 (defn -main []

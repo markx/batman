@@ -30,6 +30,8 @@
   (let [s (Socket. host port)
         in (BufferedInputStream. (.getInputStream s))
         out (.getOutputStream s)]
+    (doto s
+      (.setKeepAlive true))
     s))
 
 (defn write [c s]
@@ -165,6 +167,7 @@
 (defn read-bytes [socket]
   (-> socket
       (.getInputStream)
+      (BufferedInputStream.)
       (stream->bytes)))
 
 
