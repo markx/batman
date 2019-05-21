@@ -9,7 +9,8 @@
       LineReaderBuilder
       Completer
       Candidate
-      EndOfFileException]))
+      EndOfFileException
+      UserInterruptException]))
 
 
 (defonce dict (atom '()))
@@ -56,26 +57,37 @@
   ; blue prompt
   (format "\33[34m%s\33[39m" prompt))
 
+(defn print-above-prompt [s]
+  (.printAbove default-reader s))
+
 (defn read-line
-  ([prompt] (read-line default-reader (style-prompt prompt)))
-  ([reader prompt]
+  ([prompt] (read-line default-reader (style-prompt prompt) false))
+  ([reader prompt quit]
    (try
-     (let [line (.readLine reader prompt)]
+     (let [line (.readLine reader prompt)] ; TODO: cancel this?
        (log/debug "got line" line)
        (->> line
             (extract-candidates)
             (apply add-completion-candidates!))
        line)
-     (catch org.jline.reader.EndOfFileException e
-       nil))))
+     (catch EndOfFileException e
+       nil)
+     (catch UserInterruptException e
+       (when-not quit
+        (print-above-prompt "Press ctrl-c again to quit.")
+        (read-line default-reader prompt true))))))
 
-(defn print-above-prompt [s]
-  (.printAbove default-reader s))
-  ;(print "\33[2K\r")
+
+(defn update-prompt [prompt]
+  (when @readline-future
+    (future-cancel readline-future)
+    (read-line prompt)))
 
 (comment
   ( safe-print "haha\n")
-  (re-seq #"^|\s+(\w{2,})\s+|\z" "this&& is  a word")
-  (line->words "")
+  (clojure.string/replace "this&& is 15 words" #"\w*[@#$%^&*,]{2,}\w*" " ")
+  (clojure.string/replace "\33[34mhahahahhaha\33[39m" #"\x1b\[[0-9;]*[mG]" " ")
+  (extract-candidates "this&& is  a word")
+  (extract-candidates "")
   (read-line))
 
