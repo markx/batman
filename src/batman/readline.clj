@@ -55,7 +55,7 @@
 
 (defn style-prompt [prompt]
   ; blue prompt
-  (format "\33[34m%s\33[39m" prompt))
+  (format "\33[34m%s\33[39m" (or prompt "")))
 
 (defn print-above-prompt [s]
   (.printAbove default-reader s))
@@ -79,9 +79,10 @@
 
 
 (defn update-prompt [prompt]
-  (when @readline-future
-    (future-cancel readline-future)
-    (read-line prompt)))
+  (doto default-reader
+    (.setPrompt (style-prompt prompt))
+    (.redisplay)))
+
 
 (comment
   ( safe-print "haha\n")

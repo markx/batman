@@ -14,7 +14,7 @@
    :spit (merge (appenders/spit-appender {:fname log-file }) {:async? true})}})
 
 (defonce triggers (atom []))
-(defonce prompt (atom (promise)))
+(defonce prompt (atom nil))
 
 
 (defmacro thread [& body]
@@ -36,7 +36,6 @@
   (reduce
    (fn [m f]
      (or (safe
-           (log/debug "applying" f)
            (f m))
          m))
    msg
@@ -51,7 +50,9 @@
 (defn handle-message [m]
   (let [m (apply-triggers m)]
     (if (:prompt m)
-      (deliver @prompt m)
+      (do
+        (rl/update-prompt (:message m))
+        (reset! prompt m))
       (print-message m))
 
     (->> m
@@ -80,13 +81,13 @@
 
 (defn handle-input [c l]
   (log/info "input: " (pr-str l))
-  (reset! prompt (promise))
+  (reset! prompt nil)
   (conn/write c l)
   (println))
 
 
 (defn- get-input []
-  (rl/read-line (:message @@prompt)))
+  (rl/read-line (:message @prompt)))
 
 (defn input-loop [quit c]
   (loop []
