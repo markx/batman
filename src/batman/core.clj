@@ -28,7 +28,7 @@
 
 
 (defn message [s]
-  {:message (or s "")
+  {:text (or s "")
    :gag false})
 
 
@@ -42,21 +42,21 @@
    @triggers))
 
 (defn print-message [m]
-  (when (and (:message m)
+  (when (and (:text m)
              (not (:gag m)))
-    (rl/print-above-prompt (:message m)))
+    (rl/print-above-prompt (:text m)))
   m)
 
 (defn handle-message [m]
   (let [m (apply-triggers m)]
     (if (:prompt m)
       (do
-        (rl/update-prompt (:message m))
+        (rl/update-prompt (:text m))
         (reset! prompt m))
       (print-message m))
 
     (->> m
-        (:message)
+        (:text)
         (rl/extract-candidates)
         (apply rl/add-completion-candidates!))))
 
@@ -87,7 +87,7 @@
 
 
 (defn- get-input []
-  (rl/read-line (:message @prompt)))
+  (rl/read-line (:text @prompt)))
 
 (defn input-loop [quit c]
   (try
