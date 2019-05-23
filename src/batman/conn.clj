@@ -37,7 +37,8 @@
 (defn write [c s]
   (let [out (PrintStream. (.getOutputStream c))]
     (doto out
-      (.println s))))
+      (.println s)))
+  nil)
 
 (defn start-conn [host port]
   (reset! conn (client host port)))
@@ -60,7 +61,8 @@
               (recur (str result c)))))))))
 
 (defn send-cmd [s]
-  (write @conn s))
+  (write @conn s)
+  nil)
 
 
 (defn- take-byte-or-IAC [s]

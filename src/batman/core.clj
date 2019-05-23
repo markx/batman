@@ -28,7 +28,7 @@
 
 
 (defn message [s]
-  {:message s
+  {:message (or s "")
    :gag false})
 
 
@@ -90,11 +90,14 @@
   (rl/read-line (:message @prompt)))
 
 (defn input-loop [quit c]
-  (loop []
-    (when (not (realized? quit))
-      (when-let [l (get-input)]
-        (handle-input c l)
-        (recur))))
+  (try
+    (loop []
+      (when (not (realized? quit))
+        (when-let [l (get-input)]
+          (handle-input c l)
+          (recur))))
+    (catch java.net.SocketException e
+      (println (.getMessage e))))
   (deliver quit true))
 
 (defn nrepl-handler []
@@ -189,7 +192,6 @@
   (let [name (symbol "scripts.aaa")]
     (binding [*ns* (create-ns name)]
       (load-file "scripts/test.clj")))
-  (write-to "chat.txt" "hahahha" "heehehhe")
   (re-find #".*clj$" (.getName (clojure.java.io/file "scripts/test.clj")))
   (run! #(load-file (.getAbsolutePath %)) (filter #(.isFile %) (file-seq (clojure.java.io/file "scripts/")))))
 
