@@ -100,19 +100,24 @@
   (deliver quit true))
 
 
-(defn write-to [f & s]
+(defn write [f & s]
   (spit f (apply print-str s) :append true))
 
 
 (defn gag [m]
   (assoc m :gag true))
 
+
+(defn debug [& args]
+  (rl/print-above-prompt (apply println-str (into ["DEBUG: "] args))))
+
 (declare reload-scripts)
 (defn inject-utils [ns]
-  (doseq [[k f] {'send-cmd conn/send-cmd
-                 'write-to write-to
-                 'reload-scripts reload-scripts
-                 'gag gag}]
+  (doseq [[k f] {'SEND conn/send-cmd
+                 'WRITE write
+                 'RELOAD-SCRIPTS reload-scripts
+                 'DEBUG debug
+                 'GAG gag}]
     (intern ns k f)))
 
 
