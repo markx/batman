@@ -1,6 +1,5 @@
 (ns batman.conn
-  (:require [taoensso.timbre :as log]
-            [clj-telnet.core :as telnet])
+  (:require [taoensso.timbre :as log])
   (:import
     [java.net Socket]
     [java.io BufferedInputStream]

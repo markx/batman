@@ -1,7 +1,6 @@
 (ns batman.core
   (:gen-class)
   (:require [batman.conn :as conn]
-            [nrepl.cmdline :as nrepl-cmdline]
             [taoensso.timbre :as log]
             [taoensso.timbre.appenders.core :as appenders]
             [batman.readline :as rl]))
@@ -100,16 +99,6 @@
       (println (.getMessage e))))
   (deliver quit true))
 
-(defn nrepl-handler []
-  (require 'cider.nrepl)
-  (ns-resolve 'cider.nrepl 'cider-nrepl-handler))
-
-(defn start-nrepl-server []
-  "start a nrepl server for dev/debugging"
-  (let [nrepl (nrepl-cmdline/start-server {:handler (nrepl-handler)})]
-    (nrepl-cmdline/save-port-file nrepl nil)
-    (println (format "nREPL server started on port %d" (:port nrepl)))))
-
 
 (defn write-to [f & s]
   (spit f (apply print-str s) :append true))
@@ -176,11 +165,7 @@
 
 
 (defn -main []
-  (start-nrepl-server)
-  (loop []
-    (start)
-    (println "restarting app")
-    (recur))
+  (start)
   (System/exit 0))
 
 
