@@ -78,22 +78,22 @@
   (deliver quit true))
 
 
-(defn handle-input [c l]
+(defn handle-input [l]
   (log/info "input: " (pr-str l))
   (reset! prompt nil)
-  (conn/write c l)
+  (conn/send-cmd l)
   (println))
 
 
 (defn- get-input []
   (rl/read-line (:text @prompt)))
 
-(defn input-loop [quit c]
+(defn input-loop [quit]
   (try
     (loop []
       (when (not (realized? quit))
         (when-let [l (get-input)]
-          (handle-input c l)
+          (handle-input l)
           (recur))))
     (catch java.net.SocketException e
       (println (.getMessage e))))
@@ -163,7 +163,7 @@
     (thread
       (conn-loop quit c))
     (thread
-      (input-loop quit c))
+      (input-loop quit))
     @quit
     (conn/stop-conn)))
 
