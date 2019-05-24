@@ -13,22 +13,30 @@
       UserInterruptException]))
 
 
-(defonce dict (atom '()))
+(defonce history-dict (atom '()))
+(defonce message-dict (atom '()))
 
 
 (def HISTORY_FILE (str (System/getProperty "user.home") "/.batman_history"))
 
 
-(defn add-completion-candidates! [& s]
- (swap! dict concat s))
+(defn add-completion-candidates!
+ ([coll] (add-completion-candidates! coll message-dict))
+ ([coll d]
+  (log/debug coll)
+  (swap! d (comp #(take 1000 %) distinct reverse concat) coll)))
+
+
+(defn dict []
+  (distinct (concat @history-dict @message-dict)))
 
 (defn completer []
  (proxy [Completer] []
    (complete [reader cli candidates]
-             (when (not-empty @dict)
+             (when-let [cs (seq (dict))]
                (.addAll candidates
                         (map #(Candidate. %)
-                             @dict))))))
+                             cs))))))
 
 (defn line-reader []
    (let [terminal (-> (TerminalBuilder/builder)
@@ -46,9 +54,9 @@
 
 (defn extract-candidates [line]
  (as-> line %
-   (clojure.string/replace % #"\w*[@#$%^&*,|]{2,}\w*" " ") ; remove words with weird symbols
+   (clojure.string/replace % #"\w*[@#$%^&*,|_-]{2,}\w*" " ") ; remove words with weird symbols
    (clojure.string/replace % #"\x1b\[[0-9;]*[a-zA-Z]" " ") ; remove ansi codes
-   (clojure.string/replace % #"[^\w\s]" " ")
+   (clojure.string/replace % #"[^\w\s-]" " ")
    (clojure.string/split % #"\s+")
    (remove (comp (partial > 2) count) %)))
 
@@ -66,9 +74,9 @@
    (try
      (let [line (.readLine reader prompt)] ; TODO: cancel this?
        (log/debug "got line" line)
-       (->> line
+       (-> line
             (extract-candidates)
-            (apply add-completion-candidates!))
+            (add-completion-candidates! history-dict))
        line)
      (catch EndOfFileException e
        nil)

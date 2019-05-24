@@ -57,7 +57,7 @@
     (->> m
         (:text)
         (rl/extract-candidates)
-        (apply rl/add-completion-candidates!))))
+        (rl/add-completion-candidates!))))
 
 
 (defn handle-frame [{:keys [text prompt] :as f}]
