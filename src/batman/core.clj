@@ -17,7 +17,8 @@
 
 
 (defmacro thread [& body]
-  `(.start (Thread. (fn [] ~@body))))
+  `(doto (Thread. (fn [] ~@body))
+     (.start)))
 
 (defmacro safe [& body]
   `(try
