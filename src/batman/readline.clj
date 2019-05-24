@@ -82,8 +82,8 @@
        nil)
      (catch UserInterruptException e
        (when-not quit
-        (print-above-prompt "Press ctrl-c again to quit.")
-        (read-line default-reader prompt true))))))
+         (print-above-prompt "Press ctrl-c again to quit.")
+         (read-line default-reader prompt true))))))
 
 
 (defn update-prompt [prompt]

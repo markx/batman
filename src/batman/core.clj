@@ -92,13 +92,13 @@
 (defn input-loop [quit]
   (try
     (loop []
-      (when (not (realized? quit))
+      (when-not (realized? quit)
         (when-let [l (get-input)]
           (handle-input l)
           (recur))))
+    (deliver quit true)
     (catch java.net.SocketException e
-      (println (.getMessage e))))
-  (deliver quit true))
+      (println (.getMessage e)))))
 
 
 (defn write [f & s]
