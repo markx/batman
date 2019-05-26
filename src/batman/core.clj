@@ -27,8 +27,12 @@
        (log/error e#))))
 
 
+(defn strip-ansi-code [s]
+  (clojure.string/replace s #"\x1b\[[0-9;]*[a-zA-Z]" ""))
+
 (defn message [s]
-  {:text (or s "")
+  {:raw (or s "")
+   :text (and s (strip-ansi-code s))
    :gag false})
 
 
@@ -42,9 +46,9 @@
    @triggers))
 
 (defn print-message [m]
-  (when (and (:text m)
+  (when (and (:raw m)
              (not (:gag m)))
-    (rl/print-above-prompt (:text m)))
+    (rl/print-above-prompt (:raw m)))
   m)
 
 (defn handle-message [m]
