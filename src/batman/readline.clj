@@ -24,7 +24,7 @@
  ([coll] (add-completion-candidates! coll message-dict))
  ([coll d]
   (log/debug coll)
-  (swap! d (comp #(take 1000 %) distinct reverse concat) coll)))
+  (swap! d (comp #(take 1000 %) distinct #(apply conj %1 %2)) coll)))
 
 
 (defn dict []
@@ -54,8 +54,8 @@
 
 (defn extract-candidates [line]
  (as-> line %
+   (clojure.string/replace % #"\x1b\[[0-9;]*[a-zA-Z]" "") ; remove ansi codes
    (clojure.string/replace % #"\w*[@#$%^&*,|_-]{2,}\w*" " ") ; remove words with weird symbols
-   (clojure.string/replace % #"\x1b\[[0-9;]*[a-zA-Z]" " ") ; remove ansi codes
    (clojure.string/replace % #"[^\w\s-]" " ")
    (clojure.string/split % #"\s+")
    (remove (comp (partial > 2) count) %)))
