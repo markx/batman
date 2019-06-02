@@ -16,9 +16,6 @@
 
 
 (defn -main []
-  (start-nrepl-server)
-  (loop []
-    (batman/start)
-    (println "restarting")
-    (recur))
-  (System/exit 0))
+ (start-nrepl-server)
+ (batman/start)
+ (System/exit 0))
