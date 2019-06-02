@@ -23,12 +23,12 @@
 (defn add-completion-candidates!
  ([coll] (add-completion-candidates! coll message-dict))
  ([coll d]
-  (log/debug coll)
+  (log/debug (prn-str coll))
   (swap! d (comp #(take 1000 %) distinct #(apply conj %1 %2)) coll)))
 
 
 (defn dict []
-  (distinct (concat @history-dict @message-dict)))
+  (distinct (lazy-cat @history-dict @message-dict)))
 
 (defn completer []
  (proxy [Completer] []

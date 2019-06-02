@@ -10,7 +10,11 @@
 (log/merge-config!
  {:appenders
   {:println nil
-   :spit (merge (appenders/spit-appender {:fname log-file }) {:async? true})}})
+   :spit (merge (appenders/spit-appender {:fname log-file})
+                {:async? true
+                 :output-fn
+                 (fn [data]
+                   (log/default-output-fn (dissoc data :hostname_)))})}})
 
 (defonce triggers (atom []))
 (defonce prompt (atom nil))
