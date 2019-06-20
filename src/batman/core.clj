@@ -98,15 +98,16 @@
   (rl/read-line (:text @prompt)))
 
 (defn input-loop [quit]
-  (try
-    (loop []
-      (when-not (realized? quit)
-        (when-let [l (get-input)]
-          (handle-input l)
-          (recur))))
-    (deliver quit true)
-    (catch java.net.SocketException e
-      (println (.getMessage e)))))
+  (while (not (realized? quit))
+    (try
+      (if-let [l (get-input)]
+        (handle-input l)
+        (deliver quit true))
+      (catch java.net.SocketException e
+        (println (.getMessage e))
+        (deliver quit true))
+      (catch Throwable e
+        (prn e)))))
 
 
 (defn write [f & s]
@@ -163,19 +164,23 @@
   (reset! triggers [])
   (load-scripts))
 
+(def default-opts {:host "bat.org"
+                   :port 23})
 
-(defn start []
-  (let [quit (promise)
-        c (conn/start-conn "bat.org" 23)]
-    (log/info "connected to server" c)
-    (load-scripts)
-    (thread
-      (conn-loop quit c))
-    (thread
-      (input-loop quit))
-    @quit
-    (conn/stop-conn)))
-
+(defn start
+  ([] (start nil))
+  ([opts]
+   (let [{:keys [host port]} (merge default-opts opts)
+                quit (promise)
+                c (conn/start-conn host port)]
+     (log/info "connected to server" c)
+     (load-scripts)
+     (thread
+       (conn-loop quit c))
+     (thread
+       (input-loop quit))
+     @quit
+     (conn/stop-conn))))
 
 
 (defn -main []

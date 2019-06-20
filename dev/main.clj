@@ -17,5 +17,6 @@
 
 (defn -main []
  (start-nrepl-server)
- (batman/start)
- (System/exit 0))
+ (in-ns 'batman.core)
+ (batman/start {:host "localhost" :port 9999})
+ (clojure.main/repl))
