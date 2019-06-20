@@ -3,6 +3,8 @@
   (:refer-clojure :exclude [read-line])
   (:import
     [org.jline.terminal TerminalBuilder]
+    [org.jline.keymap
+     KeyMap]
     [org.jline.reader
       LineReader
       LineReader$Option
@@ -10,7 +12,8 @@
       Completer
       Candidate
       EndOfFileException
-      UserInterruptException]))
+      UserInterruptException
+      Reference]))
 
 
 (defonce history-dict (atom '()))
@@ -24,30 +27,46 @@
  ([coll] (add-completion-candidates! coll message-dict))
  ([coll d]
   (log/debug (prn-str coll))
-  (swap! d (comp #(take 1000 %) distinct #(apply conj %1 %2)) coll)))
+  ; maybe this lazyseq is too long and causes overflow?
+  (swap! d (comp #(take 5000 %) distinct #(apply conj %1 %2)) coll)))
 
 
 (defn dict []
-  (distinct (lazy-cat @history-dict @message-dict)))
+  (distinct (into @history-dict @message-dict)))
+
 
 (defn completer []
  (proxy [Completer] []
    (complete [reader cli candidates]
-             (when-let [cs (seq (dict))]
+             (when-let [cs (not-empty (dict))]
                (.addAll candidates
                         (map #(Candidate. %)
                              cs))))))
 
+
+(defn custom-binding [reader]
+  (doto (.get (.getKeyMaps reader) LineReader/MAIN)
+     (.bind
+       (org.jline.reader.Reference. LineReader/UP_LINE_OR_SEARCH)
+       (KeyMap/ctrl \P))
+     (.bind
+       (org.jline.reader.Reference. LineReader/DOWN_LINE_OR_SEARCH)
+       (KeyMap/ctrl \N)))
+  reader)
+
+
 (defn line-reader []
    (let [terminal (-> (TerminalBuilder/builder)
                       (.system true)
-                      (.build))]
-    (-> (LineReaderBuilder/builder)
-        (.terminal terminal)
-        (.completer (completer))
-        (.option LineReader$Option/HISTORY_TIMESTAMPED false)
-        (.variables (java.util.HashMap. {LineReader/HISTORY_FILE HISTORY_FILE}))
-        (.build))))
+                      (.build))
+         reader (-> (LineReaderBuilder/builder)
+                  (.terminal terminal)
+                  (.completer (completer))
+                  (.option LineReader$Option/HISTORY_TIMESTAMPED false)
+                  (.variables (java.util.HashMap. {LineReader/HISTORY_FILE HISTORY_FILE}))
+                  (.build))]
+    (custom-binding reader)
+    reader))
 
 (def default-reader (line-reader))
 
@@ -93,10 +112,13 @@
 
 
 (comment
-  ( safe-print "haha\n")
+  (safe-print "haha\n")
   (clojure.string/replace "this&& is 15 words" #"\w*[@#$%^&*,]{2,}\w*" " ")
   (clojure.string/replace "\33[34mhahahahhaha\33[39m" #"\x1b\[[0-9;]*[mG]" " ")
   (extract-candidates "this&& is  a word")
   (extract-candidates "")
-  (read-line))
+  (read-line)
+  (.bind (.get (.getKeyMaps default-reader) LineReader/MAIN)
+     (org.jline.reader.Reference. LineReader/UP_LINE_OR_SEARCH)
+     (KeyMap/ctrl \P)))
 
