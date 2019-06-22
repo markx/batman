@@ -27,7 +27,6 @@
  ([coll] (add-completion-candidates! coll message-dict))
  ([coll d]
   (log/debug (prn-str coll))
-  ; maybe this lazyseq is too long and causes overflow?
   (swap! d (comp #(take 5000 %) distinct #(apply conj %1 %2)) coll)))
 
 
@@ -36,12 +35,12 @@
 
 
 (defn completer []
- (proxy [Completer] []
-   (complete [reader cli candidates]
-             (when-let [cs (not-empty (dict))]
-               (.addAll candidates
-                        (map #(Candidate. %)
-                             cs))))))
+  (proxy [Completer] []
+    (complete [reader cli candidates]
+              (when-let [cs (not-empty (dict))]
+                (.addAll candidates
+                         (map #(Candidate. %)
+                               cs))))))
 
 
 (defn custom-binding [reader]
@@ -63,7 +62,10 @@
                   (.terminal terminal)
                   (.completer (completer))
                   (.option LineReader$Option/HISTORY_TIMESTAMPED false)
-                  (.variables (java.util.HashMap. {LineReader/HISTORY_FILE HISTORY_FILE}))
+                  (.variables (java.util.HashMap.
+                                {LineReader/HISTORY_FILE HISTORY_FILE,
+                                 LineReader/HISTORY_SIZE 1000000000,
+                                 LineReader/HISTORY_FILE_SIZE 1000000000,}))
                   (.build))]
     (custom-binding reader)
     reader))
