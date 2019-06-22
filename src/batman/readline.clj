@@ -27,11 +27,11 @@
  ([coll] (add-completion-candidates! coll message-dict))
  ([coll d]
   (log/debug (prn-str coll))
-  (swap! d (comp #(take 5000 %) distinct #(apply conj %1 %2)) coll)))
+  (swap! d (comp doall #(take 5000 %) distinct #(apply conj %1 %2)) coll)))
 
 
 (defn dict []
-  (distinct (into @history-dict @message-dict)))
+  (distinct (concat @history-dict @message-dict)))
 
 
 (defn completer []
