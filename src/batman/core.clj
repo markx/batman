@@ -135,15 +135,16 @@
   (swap! triggers conj f))
 
 
-(defn load-script [path]
-  (let [name (-> path
-                 (clojure.string/replace #"\.clj$" "")
-                 (clojure.string/replace #"/" "."))
+(defn load-script [file]
+  (let [name (as-> file %
+                 (.getName %)
+                 (clojure.string/replace % #"\.clj$" "")
+                 (str "script." %))
         space (create-ns (symbol name))]
     (inject-utils space)
     (binding [*ns* space]
       (clojure.core/refer-clojure)
-      (safe (load-file path))
+      (safe (load-file (.getPath file)))
       (log/info "created ns: " name)
 
       (when-let [u (resolve (symbol name "UPDATE"))]
@@ -153,11 +154,11 @@
 
 (defn load-scripts
   ([] (load-scripts "scripts/"))
-  ([path] (run!  #(load-script (.getPath %))
-                 (filter (fn [file]
-                           (and (.isFile file)
-                                (re-find #"\.clj$" (.getName file))))
-                         (file-seq (clojure.java.io/file path))))))
+  ([path] (run! load-script
+                (filter (fn [file]
+                          (and (.isFile file)
+                               (re-find #"\.clj$" (.getName file))))
+                        (file-seq (clojure.java.io/file path))))))
 
 
 (defn reload-scripts []
@@ -174,7 +175,7 @@
                 quit (promise)
                 c (conn/start-conn host port)]
      (log/info "connected to server" c)
-     (load-scripts)
+     (reload-scripts)
      (thread
        (conn-loop quit c))
      (thread
