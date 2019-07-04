@@ -47,7 +47,7 @@
            (f m))
          m))
    msg
-   @triggers))
+   (map :func (sort-by :priority @triggers))))
 
 (defn print-message [m]
   (when (and (:raw m)
@@ -121,18 +121,25 @@
 (defn debug [& args]
   (rl/print-above-prompt (apply println-str (into ["DEBUG: "] args))))
 
+
+(defn register-trigger!
+  ([f] (register-trigger! f 0))
+  ([f priority]
+   (swap! triggers conj {:func f
+                         :priority priority})
+   (log/info "regiestered" f priority)
+   (log/info "triggers" @triggers)))
+
+
 (declare reload-scripts)
 (defn inject-utils [ns]
   (doseq [[k f] {'SEND conn/send-cmd
                  'WRITE write
                  'RELOAD-SCRIPTS reload-scripts
                  'DEBUG debug
-                 'GAG gag}]
+                 'GAG gag
+                 'TRIGGER register-trigger!}]
     (intern ns k f)))
-
-
-(defn register-trigger! [f]
-  (swap! triggers conj f))
 
 
 (defn load-script [file]
@@ -145,12 +152,8 @@
     (binding [*ns* space]
       (clojure.core/refer-clojure)
       (safe (load-file (.getPath file)))
-      (log/info "created ns: " name)
+      (log/info "created ns: " name))))
 
-      (when-let [u (resolve (symbol name "UPDATE"))]
-        (register-trigger! u)
-        (log/info "regiestered UPDATE " (ns-name space))
-        (log/info "triggers" @triggers)))))
 
 (defn load-scripts
   ([] (load-scripts "scripts/"))
