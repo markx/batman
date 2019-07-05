@@ -3,7 +3,8 @@
   (:require [batman.conn :as conn]
             [taoensso.timbre :as log]
             [taoensso.timbre.appenders.core :as appenders]
-            [batman.readline :as rl]))
+            [batman.readline :as rl]
+            [batman.script :as script]))
 
 
 (def log-file "debug.log")
@@ -49,6 +50,10 @@
    msg
    (map :func (sort-by :priority @triggers))))
 
+
+(defn is-code [l]
+  (not-empty (re-find #"^\(.+\)$" l)))
+
 (defn print-message [m]
   (when (and (:raw m)
              (not (:gag m)))
@@ -87,11 +92,19 @@
   (deliver quit true))
 
 
+(defn handle-code [l]
+  (binding [*ns* (find-ns 'batman.script)]
+    (safe (prn (load-string l)))))
+
+
 (defn handle-input [l]
   (log/info "input: " (pr-str l))
-  (reset! prompt nil)
-  (conn/send-cmd l)
-  (println))
+  (if (is-code l)
+    (handle-code l)
+    (do
+      (reset! prompt nil)
+      (conn/send-cmd l))))
+  ;(println))
 
 
 (defn- get-input []
@@ -123,7 +136,7 @@
 
 
 (defn register-trigger!
-  ([f] (register-trigger! f 0))
+  ([f] (register-trigger! f 1))
   ([f priority]
    (swap! triggers conj {:func f
                          :priority priority})
@@ -143,16 +156,21 @@
 
 
 (defn load-script [file]
-  (let [name (as-> file %
-                 (.getName %)
-                 (clojure.string/replace % #"\.clj$" "")
-                 (str "script." %))
-        space (create-ns (symbol name))]
+  (let [fname (-> file 
+                  (.getName)
+                  (clojure.string/replace #"\.clj$" ""))
+        nsname (str "script." fname)
+        space (create-ns (symbol nsname))]
     (inject-utils space)
     (binding [*ns* space]
       (clojure.core/refer-clojure)
       (safe (load-file (.getPath file)))
-      (log/info "created ns: " name))))
+      (log/info "created ns: " nsname))
+
+    (binding [*ns* (find-ns 'batman.script)]
+      (log/debug (symbol fname) nsname)
+      (alias (symbol fname) (symbol nsname)))))
+
 
 
 (defn load-scripts
