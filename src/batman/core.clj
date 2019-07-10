@@ -151,12 +151,13 @@
                  'RELOAD-SCRIPTS reload-scripts
                  'DEBUG debug
                  'GAG gag
+                 'BEEP #(println (char 7))
                  'TRIGGER register-trigger!}]
     (intern ns k f)))
 
 
 (defn load-script [file]
-  (let [fname (-> file 
+  (let [fname (-> file
                   (.getName)
                   (clojure.string/replace #"\.clj$" ""))
         nsname (str "script." fname)
