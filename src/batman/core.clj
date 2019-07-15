@@ -4,7 +4,7 @@
             [taoensso.timbre :as log]
             [taoensso.timbre.appenders.core :as appenders]
             [batman.readline :as rl]
-            [batman.script :as script]))
+            [clojure.string :as string]))
 
 
 (def log-file "debug.log")
@@ -18,6 +18,7 @@
                    (log/default-output-fn (dissoc data :hostname_)))})}})
 
 (defonce triggers (atom []))
+(defonce aliases (atom []))
 (defonce prompt (atom nil))
 
 
@@ -33,7 +34,7 @@
 
 
 (defn strip-ansi-code [s]
-  (clojure.string/replace s #"\x1b\[[0-9;]*[a-zA-Z]" ""))
+  (string/replace s #"\x1b\[[0-9;]*[a-zA-Z]" ""))
 
 (defn message [s]
   {:raw (or s "")
@@ -52,7 +53,8 @@
 
 
 (defn is-code [l]
-  (not-empty (re-find #"^\(.+\)$" l)))
+  (not-empty (re-find #"^\(.+\)\s*$" l)))
+
 
 (defn print-message [m]
   (when (and (:raw m)
@@ -97,14 +99,35 @@
     (safe (prn (load-string l)))))
 
 
+(defn match-alias [l]
+  (some (fn [{:keys [pattern handler] :as a}]
+          (when (and pattern
+                     handler
+                     (re-find pattern l))
+            a))
+        (sort-by :priority @aliases)))
+
+
+(defn apply-alias [{:keys [handler pattern]} l]
+  (if (fn? handler)
+    (and (handler l) nil)
+    (string/replace l pattern handler)))
+
+
 (defn handle-input [l]
   (log/info "input: " (pr-str l))
-  (if (is-code l)
+  (cond
+    (is-code l)
     (handle-code l)
-    (do
-      (reset! prompt nil)
-      (conn/send-cmd l))))
-  ;(println))
+
+    :else
+    (if-let [a (match-alias l)]
+      (when-let [expanded (apply-alias a l)]
+        (reset! prompt nil)
+        (conn/send-cmd expanded))
+      (do
+        (reset! prompt nil)
+        (conn/send-cmd l)))))
 
 
 (defn- get-input []
@@ -143,6 +166,13 @@
    (log/info "regiestered" f priority)
    (log/info "triggers" @triggers)))
 
+(defn register-alias!
+  ([p h] (register-alias! p h 1))
+  ([p h priority]
+   (swap! aliases conj {:handler h
+                        :pattern p
+                        :priority priority})
+   (log/info "regiestered alias" p h priority)))
 
 (declare reload-scripts)
 (defn inject-utils [ns]
@@ -152,14 +182,15 @@
                  'DEBUG debug
                  'GAG gag
                  'BEEP #(println (char 7))
-                 'TRIGGER register-trigger!}]
+                 'TRIGGER register-trigger!
+                 'ALIAS register-alias!}]
     (intern ns k f)))
 
 
 (defn load-script [file]
   (let [fname (-> file
                   (.getName)
-                  (clojure.string/replace #"\.clj$" ""))
+                  (string/replace #"\.clj$" ""))
         nsname (str "script." fname)
         space (create-ns (symbol nsname))]
     (inject-utils space)
@@ -182,10 +213,20 @@
                                (re-find #"\.clj$" (.getName file))))
                         (file-seq (clojure.java.io/file path))))))
 
+(defn reset-scripts! []
+  (reset! triggers [])
+  (reset! aliases []))
 
 (defn reload-scripts []
-  (reset! triggers [])
+  (reset-scripts!)
   (load-scripts))
+
+
+(defn init-script-env []
+  (let [space (create-ns 'batman.script)]
+    (inject-utils space)
+    (require '[batman.script :reload :verbose])
+    (println @aliases)))
 
 (def default-opts {:host "bat.org"
                    :port 23})
@@ -197,7 +238,9 @@
                 quit (promise)
                 c (conn/start-conn host port)]
      (log/info "connected to server" c)
-     (reload-scripts)
+     (reset-scripts!)
+     (init-script-env)
+     (load-scripts)
      (thread
        (conn-loop quit c))
      (thread
