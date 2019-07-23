@@ -45,8 +45,7 @@
 (defn apply-triggers [msg]
   (reduce
    (fn [m f]
-     (or (safe
-           (f m))
+     (or (safe (f m))
          m))
    msg
    (map :func (sort-by :priority @triggers))))
@@ -71,21 +70,19 @@
       (print-message m))
 
     (->> m
-        (:text)
-        (rl/extract-candidates)
-        (rl/add-completion-candidates!))))
-
+         (:text)
+         (rl/extract-candidates)
+         (rl/add-completion-candidates!))))
 
 (defn handle-frame [{:keys [text prompt] :as f}]
   (if (or text prompt)
     (->> text
-      (map char)
-      (apply str)
-      (message)
-      (merge {:prompt prompt})
-      (handle-message))
+         (map char)
+         (apply str)
+         (message)
+         (merge {:prompt prompt})
+         (handle-message))
     (log/debug f)))
-
 
 (defn conn-loop [quit c]
   (let [frames (conn/bytes->frames (conn/read-bytes c))]
@@ -93,11 +90,9 @@
 
   (deliver quit true))
 
-
 (defn handle-code [l]
   (binding [*ns* (find-ns 'batman.script)]
     (safe (prn (load-string l)))))
-
 
 (defn match-alias [l]
   (some (fn [{:keys [pattern handler] :as a}]
@@ -107,12 +102,10 @@
             a))
         (sort-by :priority @aliases)))
 
-
-(defn apply-alias [{:keys [handler pattern]} l]
+(defn expand-alias [{:keys [handler pattern]} l]
   (if (fn? handler)
-    (and (handler l) nil)
+    (some string? [(handler l)])
     (string/replace l pattern handler)))
-
 
 (defn handle-input [l]
   (log/info "input: " (pr-str l))
@@ -122,13 +115,12 @@
 
     :else
     (if-let [a (match-alias l)]
-      (when-let [expanded (apply-alias a l)]
+      (when-let [expanded (expand-alias a l)]
         (reset! prompt nil)
         (conn/send-cmd expanded))
       (do
         (reset! prompt nil)
         (conn/send-cmd l)))))
-
 
 (defn- get-input []
   (rl/read-line (:text @prompt)))
@@ -235,8 +227,8 @@
   ([] (start nil))
   ([opts]
    (let [{:keys [host port]} (merge default-opts opts)
-                quit (promise)
-                c (conn/start-conn host port)]
+         quit (promise)
+         c (conn/start-conn host port)]
      (log/info "connected to server" c)
      (reset-scripts!)
      (init-script-env)
