@@ -7,9 +7,9 @@
  :paths ["src"]
  :aliases
  {:dev
-  {:jvm-opts    ["-ea"]
+  {:jvm-opts    ["-ea", "-XX:-OmitStackTraceInFastThrow"]
    :extra-paths ["dev"]
    :extra-deps  {nrepl {:mvn/version "0.6.0"}
-                 cider/cider-nrepl {:mvn/version "0.21.1"}
+                 cider/cider-nrepl {:mvn/version "0.22.0"}
                  com.bhauman/rebel-readline {:mvn/version "0.1.4"}}
    :main-opts ["-m" "main"]}}}
