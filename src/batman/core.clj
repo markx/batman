@@ -209,16 +209,17 @@
   (reset! triggers [])
   (reset! aliases []))
 
-(defn reload-scripts []
-  (reset-scripts!)
-  (load-scripts))
-
-
 (defn init-script-env []
   (let [space (create-ns 'batman.script)]
     (inject-utils space)
     (require '[batman.script :reload :verbose])
     (println @aliases)))
+
+(defn reload-scripts []
+  (reset-scripts!)
+  (init-script-env)
+  (load-scripts))
+
 
 (def default-opts {:host "bat.org"
                    :port 23})
