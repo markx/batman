@@ -2,18 +2,18 @@
   (:require [taoensso.timbre :as log])
   (:refer-clojure :exclude [read-line])
   (:import
-    [org.jline.terminal TerminalBuilder]
-    [org.jline.keymap
-     KeyMap]
-    [org.jline.reader
-      LineReader
-      LineReader$Option
-      LineReaderBuilder
-      Completer
-      Candidate
-      EndOfFileException
-      UserInterruptException
-      Reference]))
+   [org.jline.terminal TerminalBuilder]
+   [org.jline.keymap
+    KeyMap]
+   [org.jline.reader
+    LineReader
+    LineReader$Option
+    LineReaderBuilder
+    Completer
+    Candidate
+    EndOfFileException
+    UserInterruptException
+    Reference]))
 
 
 (defonce history-dict (atom '()))
@@ -24,10 +24,10 @@
 
 
 (defn add-completion-candidates!
- ([coll] (add-completion-candidates! coll message-dict))
- ([coll d]
-  (log/debug (prn-str coll))
-  (swap! d (comp doall #(take 5000 %) distinct #(apply conj %1 %2)) coll)))
+  ([coll] (add-completion-candidates! coll message-dict))
+  ([coll d]
+   (log/debug (prn-str coll))
+   (swap! d (comp doall #(take 5000 %) distinct #(apply conj %1 %2)) coll)))
 
 
 (defn dict []
@@ -37,36 +37,36 @@
 (defn completer []
   (proxy [Completer] []
     (complete [reader cli candidates]
-              (when-let [cs (not-empty (dict))]
-                (.addAll candidates
-                         (map #(Candidate. %)
-                               cs))))))
+      (when-let [cs (not-empty (dict))]
+        (.addAll candidates
+                 (map #(Candidate. %)
+                      cs))))))
 
 
 (defn custom-binding [reader]
   (doto (.get (.getKeyMaps reader) LineReader/MAIN)
-     (.bind
-       (org.jline.reader.Reference. LineReader/UP_LINE_OR_SEARCH)
-       (KeyMap/ctrl \P))
-     (.bind
-       (org.jline.reader.Reference. LineReader/DOWN_LINE_OR_SEARCH)
-       (KeyMap/ctrl \N)))
+    (.bind
+     (org.jline.reader.Reference. LineReader/UP_LINE_OR_SEARCH)
+     (KeyMap/ctrl \P))
+    (.bind
+     (org.jline.reader.Reference. LineReader/DOWN_LINE_OR_SEARCH)
+     (KeyMap/ctrl \N)))
   reader)
 
 
 (defn line-reader []
-   (let [terminal (-> (TerminalBuilder/builder)
-                      (.system true)
-                      (.build))
-         reader (-> (LineReaderBuilder/builder)
-                  (.terminal terminal)
-                  (.completer (completer))
-                  (.option LineReader$Option/HISTORY_TIMESTAMPED false)
-                  (.variables (java.util.HashMap.
+  (let [terminal (-> (TerminalBuilder/builder)
+                     (.system true)
+                     (.build))
+        reader (-> (LineReaderBuilder/builder)
+                   (.terminal terminal)
+                   (.completer (completer))
+                   (.option LineReader$Option/HISTORY_TIMESTAMPED false)
+                   (.variables (java.util.HashMap.
                                 {LineReader/HISTORY_FILE HISTORY_FILE,
                                  LineReader/HISTORY_SIZE 1000000000,
-                                 LineReader/HISTORY_FILE_SIZE 1000000000,}))
-                  (.build))]
+                                 LineReader/HISTORY_FILE_SIZE 1000000000}))
+                   (.build))]
     (custom-binding reader)
     reader))
 
@@ -96,8 +96,8 @@
      (let [line (.readLine reader prompt)] ; TODO: cancel this?
        (log/debug "got line" line)
        (-> line
-            (extract-candidates)
-            (add-completion-candidates! history-dict))
+           (extract-candidates)
+           (add-completion-candidates! history-dict))
        line)
      (catch EndOfFileException e
        nil)

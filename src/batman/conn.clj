@@ -1,9 +1,9 @@
 (ns batman.conn
   (:require [taoensso.timbre :as log])
   (:import
-    [java.net Socket]
-    [java.io BufferedInputStream]
-    [java.io PrintStream PrintWriter]))
+   [java.net Socket]
+   [java.io BufferedInputStream]
+   [java.io PrintStream PrintWriter]))
 
 
 (def cmd-SE    240)
@@ -124,11 +124,11 @@
         (= cmd-SB x)
         (loop [result nil rs rs]
           (if (and (= cmd-IAC (first rs))
-                  (= cmd-SE (second rs)))
-              {:frame {:cmd result}
-               :rest (rest (rest rs))}
-              (let [{:keys [b rest]} (take-byte-or-IAC rs)]
-                (recur (conj result b) rest))))
+                   (= cmd-SE (second rs)))
+            {:frame {:cmd result}
+             :rest (rest (rest rs))}
+            (let [{:keys [b rest]} (take-byte-or-IAC rs)]
+              (recur (conj result b) rest))))
 
         (= cmd-GA x)
         {:frame {:text nil :prompt true}
@@ -143,8 +143,8 @@
 (defn bytes->frames [s]
   (when (seq s)
     (let [take-func (if (cmd-seq? s)
-                        take-cmd
-                        take-text)]
+                      take-cmd
+                      take-text)]
       (let [{:keys [frame rest]} (take-func s)]
         (if frame
           (cons frame (lazy-seq (bytes->frames rest)))
