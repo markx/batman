@@ -18,14 +18,13 @@
     (nrepl-cmdline/save-port-file nrepl nil)
     (println (format "nREPL server started on port %d" (:port nrepl)))))
 
-
 (defn -main []
- (start-nrepl-server)
- (in-ns 'batman.core)
- (batman/start {:host "localhost" :port 9999})
- (rebel-readline.core/with-line-reader
-   (rebel-readline.clojure.line-reader/create
+  (start-nrepl-server)
+
+  (in-ns 'batman.core)
+  (rebel-readline.core/with-line-reader
+    (rebel-readline.clojure.line-reader/create
      (rebel-readline.clojure.service.local/create))
-   (clojure.main/repl
+    (clojure.main/repl
      :prompt (fn []) ;; prompt is handled by line-reader
      :read (rebel-readline.clojure.main/create-repl-read))))

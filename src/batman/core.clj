@@ -244,13 +244,9 @@
      @quit
      (conn/stop-conn))))
 
-
-(defn -main []
-  (start)
-  (System/exit 0))
-
-
 (comment
+  (is-code "(println 1)")
+  (string/replace "/clw" #"^/clw" "heal me")
   (Thread/sleep 1000)
   (load-file "scripts/test.clj")
   (load-script "scripts/test.clj")
