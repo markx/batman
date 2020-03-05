@@ -17,6 +17,7 @@
                  (fn [data]
                    (log/default-output-fn (dissoc data :hostname_)))})}})
 
+(defonce options (atom nil))
 (defonce triggers (atom []))
 (defonce aliases (atom []))
 (defonce prompt (atom nil))
@@ -181,10 +182,10 @@
 
 (defn load-script [file]
   (let [fname (-> file
-                  (.getName)
-                  (string/replace #"\.clj$" ""))
-        nsname (str "script." fname)
+                  (.getName))
+        nsname (str "script." (string/replace fname #"\.clj$" ""))
         space (create-ns (symbol nsname))]
+    (debug "loaded script: " fname)
     (inject-utils space)
     (binding [*ns* space]
       (clojure.core/refer-clojure)
@@ -198,7 +199,7 @@
 
 
 (defn load-scripts
-  ([] (load-scripts "scripts/"))
+  ([] (load-scripts (:scripts-path @options)))
   ([path] (run! load-script
                 (filter (fn [file]
                           (and (.isFile file)
@@ -222,14 +223,16 @@
 
 
 (def default-opts {:host "bat.org"
-                   :port 23})
+                   :port 23
+                   :scripts-path "."})
 
 (defn start
   ([] (start nil))
   ([opts]
-   (let [{:keys [host port]} (merge default-opts opts)
+   (let [{:keys [host port] :as opts} (merge default-opts opts)
          quit (promise)
          c (conn/start-conn host port)]
+     (reset! options opts)
      (log/info "connected to server" c)
      (reset-scripts!)
      (init-script-env)
