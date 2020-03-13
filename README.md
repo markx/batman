@@ -1,6 +1,6 @@
 # batman
 
-One command-line BatMUD client.
+A command-line minimalistic BatMUD client.
 
 ## Features
 - Run in a terminal.
