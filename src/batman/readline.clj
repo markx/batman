@@ -16,6 +16,7 @@
     Reference]))
 
 
+(defonce current-reader (atom nil))
 (defonce history-dict (atom '()))
 (defonce message-dict (atom '()))
 
@@ -70,8 +71,6 @@
     (custom-binding reader)
     reader))
 
-(def default-reader (line-reader))
-
 
 (defn extract-candidates [line]
  (as-> line %
@@ -87,10 +86,18 @@
   (format "\33[34m%s\33[39m" (or prompt "")))
 
 (defn print-above-prompt [s]
-  (.printAbove default-reader s))
+  (if @current-reader
+    (.printAbove @current-reader s)
+    (do
+      (print s)
+      (flush))))
+
+
+(defn init! []
+  (reset! current-reader (line-reader)))
 
 (defn read-line
-  ([prompt] (read-line default-reader (style-prompt prompt) false))
+  ([prompt] (read-line @current-reader (style-prompt prompt) false))
   ([reader prompt quit]
    (try
      (let [line (.readLine reader prompt)] ; TODO: cancel this?
@@ -104,14 +111,14 @@
      (catch UserInterruptException e
        (when-not quit
          (print-above-prompt "Press ctrl-c again to quit.")
-         (read-line default-reader prompt true))))))
-
+         (read-line reader prompt true))))))
 
 (defn update-prompt [prompt]
-  (doto default-reader
-    (.setPrompt (style-prompt prompt))
-    (.redisplay)))
-
+  (when (and @current-reader
+             (.isReading @current-reader))
+    (doto @current-reader
+      (.setPrompt (style-prompt prompt))
+      (.redisplay))))
 
 (comment
   (safe-print "haha\n")
@@ -119,8 +126,7 @@
   (clojure.string/replace "\33[34mhahahahhaha\33[39m" #"\x1b\[[0-9;]*[mG]" " ")
   (extract-candidates "this&& is  a word")
   (extract-candidates "")
-  (read-line)
-  (.bind (.get (.getKeyMaps default-reader) LineReader/MAIN)
-     (org.jline.reader.Reference. LineReader/UP_LINE_OR_SEARCH)
-     (KeyMap/ctrl \P)))
+  (.bind (.get (.getKeyMaps @current-reader)) LineReader/MAIN
+         (org.jline.reader.Reference. LineReader/UP_LINE_OR_SEARCH)
+         (KeyMap/ctrl \P)))
 

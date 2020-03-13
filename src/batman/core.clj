@@ -234,6 +234,7 @@
          c (conn/start-conn host port)]
      (reset! options opts)
      (log/info "connected to server" c)
+     (rl/init!)
      (reset-scripts!)
      (init-script-env)
      (load-scripts)
