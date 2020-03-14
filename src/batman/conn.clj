@@ -83,14 +83,26 @@
     (let [x (first s)
           rs (rest s)]
       (cond
+        ;; drop all leading ::timeout
+        (= ::timeout x)
+        {:rest (drop-while #(= ::timeout %) s)}
+
         (= (byte \newline) x)
         {:frame {:text [\newline]}
          :rest rs}
 
+        ;; prompt by GA
         (and (= cmd-IAC x)
              (= cmd-GA (first rs)))
         {:frame {:text nil :prompt true}
          :rest (rest rs)}
+
+        ;; some servers don't send GA or newline for prompt,
+        ;; so we use a timeout to detect prompt and flush the text.
+        (and (not= ::timeout x)
+             (= ::timeout (first rs)))
+        {:frame {:text [x] :prompt true}
+         :rest rs}
 
         (cmd-seq? s)
         {:frame nil
@@ -106,6 +118,7 @@
         (let [{subframe :frame rs :rest} (take-text rs)]
           {:frame (update subframe :text (partial cons x))
            :rest rs})))))
+
 
 (defn take-cmd [s]
   (when (= (first s) cmd-IAC)
@@ -144,18 +157,35 @@
   (when (seq s)
     (let [take-func (if (cmd-seq? s)
                       take-cmd
-                      take-text)]
-      (let [{:keys [frame rest]} (take-func s)]
-        (if frame
-          (cons frame (lazy-seq (bytes->frames rest)))
-          (bytes->frames rest))))))
+                      take-text)
+          {:keys [frame rest]} (take-func s)]
+      (log/info frame)
+      (if frame
+        (cons frame (lazy-seq (bytes->frames rest)))
+        (bytes->frames rest)))))
+
+(defn- now []
+  (.getTime (java.util.Date.)))
+
+(defn read-byte-or-timeout [in]
+  (let [t (now)]
+    (loop []
+      (if (< 0 (.available in))
+        (.read in)
+        (if (< 200
+               (- (now) t))
+            ::timeout
+            (do
+              (Thread/sleep 10)
+              (recur)))))))
+
 
 (defn stream->bytes [in]
   (take-while some?
    (repeatedly
      (fn []
        (try
-         (let [b (.read in)]
+         (let [b (read-byte-or-timeout in)]
            (if (= b -1) ;EOF
              (throw (java.io.EOFException. "EOF"))
              b))
