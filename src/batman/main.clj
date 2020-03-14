@@ -15,7 +15,7 @@
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
    ["-s" "--scripts PATH" "Path to scripts"
-    :default "."
+    :default ""
     :validate [#(.exists (clojure.java.io/file %)) "Path doesn't exist"]]
    ;; A non-idempotent option (:default is applied first)
    ["-h" "--help"]])

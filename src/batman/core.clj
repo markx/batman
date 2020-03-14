@@ -224,7 +224,7 @@
 
 (def default-opts {:host "bat.org"
                    :port 23
-                   :scripts-path "."})
+                   :scripts-path ""})
 
 (defn start
   ([] (start nil))
